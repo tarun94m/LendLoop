@@ -1,0 +1,11 @@
+:root{--bg:#fafaf7;--fg:#1c1c1a;--mut:#6b6b66;--line:#e4e4de;--acc:#2f6f4f}
+@media(prefers-color-scheme:dark){:root{--bg:#161614;--fg:#eeeee8;--mut:#9a9a92;--line:#2e2e2a;--acc:#6fbf94}}
+*{box-sizing:border-box}body{margin:0;font:15px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--fg)}
+main{max-width:860px;margin:0 auto;padding:32px 20px}h1{margin:0}h2{font-size:17px;margin:24px 0 8px}
+.mut{color:var(--mut)}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.between{justify-content:space-between}
+.card{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:8px 0}
+button,.btn{font:inherit;border:1px solid var(--line);background:transparent;color:var(--fg);padding:6px 12px;border-radius:8px;cursor:pointer}
+button.p{background:var(--acc);color:#fff;border-color:var(--acc)}button.d{color:#b3402f}
+input,select,textarea{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit}
+.tag{font-size:12px;border:1px solid var(--line);border-radius:99px;padding:1px 8px;color:var(--mut)}.tabs button.on{border-color:var(--acc);color:var(--acc)}
+.err{color:#b3402f}

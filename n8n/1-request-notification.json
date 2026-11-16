@@ -1,0 +1,140 @@
+{
+  "name": "LendLoop - Request notification",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lendloop-request",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "lendloop-request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst req = $input.first().json;\nconst sig = String(req.headers['x-lendloop-signature'] || '');\nconst ts = String(req.headers['x-lendloop-timestamp'] || '');\nif (!ts || Math.abs(Date.now() - Number(ts)) > 5 * 60 * 1000) throw new Error('Stale or missing timestamp');\nconst expected = crypto.createHmac('sha256', $env.LENDLOOP_WEBHOOK_SECRET).update(ts + '.' + JSON.stringify(req.body)).digest('hex');\nconst a = Buffer.from(expected), b = Buffer.from(sig);\nif (a.length !== b.length || !crypto.timingSafeEqual(a, b)) throw new Error('Invalid signature');\nreturn [{ json: req.body }];"
+      },
+      "name": "Verify HMAC signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const e = $input.first().json;\nconst t = {\n  request_created: `New request for your ${e.toolName} (${e.startDate} to ${e.endDate}).`,\n  request_approved: `Your request for ${e.toolName} was approved (${e.startDate} to ${e.endDate}).`,\n  request_declined: `Your request for ${e.toolName} was declined.`,\n  loan_returned: `${e.toolName} has been marked as returned. Thanks!`\n};\nconst msg = t[e.type];\nif (!msg) throw new Error('Unknown event type: ' + e.type);\n// MOCK NOTIFICATION: swap for a Send Email / Slack node. Only name+email are available here by design.\nconsole.log(`[notify] to=${e.recipient.email} :: ${msg} (event ${e.eventId})`);\nreturn [{ json: { to: e.recipient.email, message: msg, eventId: e.eventId } }];"
+      },
+      "name": "Compose + mock notify",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: $env.MAIL_FROM, to: [$json.to], subject: 'LendLoop update', text: $json.message }) }}",
+        "options": {}
+      },
+      "name": "Send email (Resend)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_AFTER_IMPORT",
+          "name": "Resend API key"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, eventId: $('Compose + mock notify').first().json.eventId } }}"
+      },
+      "name": "Respond 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify HMAC signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify HMAC signature": {
+      "main": [
+        [
+          {
+            "node": "Compose + mock notify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose + mock notify": {
+      "main": [
+        [
+          {
+            "node": "Send email (Resend)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send email (Resend)": {
+      "main": [
+        [
+          {
+            "node": "Respond 200",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all"
+  },
+  "active": false
+}

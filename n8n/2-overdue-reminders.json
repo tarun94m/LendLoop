@@ -1,0 +1,28 @@
+{
+  "name": "LendLoop - Overdue reminders",
+  "nodes": [
+    { "parameters": { "rule": { "interval": [{ "field": "days", "triggerAtHour": 9 }] } },
+      "name": "Daily 09:00", "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2, "position": [0, 0] },
+    { "parameters": { "url": "={{ $env.CONVEX_SITE_URL }}/overdue", "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "options": {} },
+      "name": "Fetch overdue loans", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [220, 0],
+      "credentials": { "httpHeaderAuth": { "id": "REPLACE_AFTER_IMPORT", "name": "LendLoop Convex API key" } },
+      "retryOnFail": true, "maxTries": 3, "waitBetweenTries": 3000 },
+    { "parameters": { "jsCode": "return ($input.first().json.loans || []).map(l => ({ json: l }));" },
+      "name": "One item per loan", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [440, 0] },
+    { "parameters": { "jsCode": "const l = $input.first().json;\n// MOCK REMINDER: replace with Send Email / Slack node.\nconsole.log(`[reminder] to=${l.borrower.email} :: ${l.toolName} was due ${l.dueDate} (${l.daysOverdue}d overdue)`);\nreturn [{ json: { loanId: l.loanId, idempotencyKey: l.idempotencyKey, status: 'sent' } }];" },
+      "name": "Send reminder (mock)", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [660, 0],
+      "retryOnFail": true, "maxTries": 3, "waitBetweenTries": 2000 },
+    { "parameters": { "method": "POST", "url": "={{ $env.CONVEX_SITE_URL }}/reminder-result", "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "sendBody": true, "specifyBody": "json", "jsonBody": "={{ JSON.stringify($json) }}", "options": {} },
+      "name": "Write back result (idempotent)", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [880, 0],
+      "credentials": { "httpHeaderAuth": { "id": "REPLACE_AFTER_IMPORT", "name": "LendLoop Convex API key" } },
+      "retryOnFail": true, "maxTries": 4, "waitBetweenTries": 3000 }
+  ],
+  "connections": {
+    "Daily 09:00": { "main": [[{ "node": "Fetch overdue loans", "type": "main", "index": 0 }]] },
+    "Fetch overdue loans": { "main": [[{ "node": "One item per loan", "type": "main", "index": 0 }]] },
+    "One item per loan": { "main": [[{ "node": "Send reminder (mock)", "type": "main", "index": 0 }]] },
+    "Send reminder (mock)": { "main": [[{ "node": "Write back result (idempotent)", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1", "saveDataErrorExecution": "all" },
+  "active": false
+}
